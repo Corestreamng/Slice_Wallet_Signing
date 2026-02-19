@@ -112,7 +112,12 @@ function App() {
     <div style={{ textAlign: "center", marginTop: 50 }}>
       {step === "idle" && <h2>Initializing...</h2>}
       {step === "checking" && <h2>Checking profile...</h2>}
-      {step === "connecting" && <h2>Connecting wallet...</h2>}
+      {step === "connecting" && (
+        <div>
+          <h3>Welcome <span>{user?.username}</span></h3>
+          <span>Connecting wallet...</span>
+        </div>
+      )}
       {step === "done" && (
         <>
           <h2>Wallet connected successfully ✅</h2>
