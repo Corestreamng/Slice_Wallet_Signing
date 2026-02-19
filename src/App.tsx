@@ -114,14 +114,31 @@ function App() {
       {step === "checking" && <h2>Checking profile...</h2>}
       {step === "connecting" && (
         <div>
-          <h3>Welcome <span>{user?.username}</span></h3>
+          <h3>
+            Welcome <span>{user?.username}</span>
+          </h3>
           <span>Connecting wallet...</span>
         </div>
       )}
       {step === "done" && (
         <>
           <h2>Wallet connected successfully ✅</h2>
-          <pre>{JSON.stringify(user, null, 2)}</pre>
+          <div>
+            <a
+              href={`slice://`}
+              style={{
+                padding: "16px 32px",
+                background: "#3b82f6",
+                color: "white",
+                borderRadius: 12,
+                textDecoration: "none",
+                fontWeight: "bold",
+                marginTop:12
+              }}
+            >
+              Return to App
+            </a>
+          </div>
         </>
       )}
       {step === "error" && (
