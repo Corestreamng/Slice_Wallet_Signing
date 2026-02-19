@@ -94,7 +94,7 @@ function App() {
       message,
     };
 
-    const connectResp = await fetch("/api/properties/wallet/connect", {
+    const connectResp = await fetch("/api/users/wallets/connect", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
