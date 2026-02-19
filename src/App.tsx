@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import "./App.css";
 
-interface user {
+interface User {
   id: string;
   email: string;
   username: string;
@@ -12,48 +12,32 @@ interface user {
   updatedAt: string;
 }
 
+type Step = "idle" | "checking" | "connecting" | "done" | "error";
+
 function App() {
-  const [token, setToken] = useState<string | null>(null);
-  const [user, setUser] = useState<user | null>(null);
-  const [link, setLink] = useState("");
-
-  useEffect(() => {
-    async function run() {
-      const accounts = await (window as any).ethereum.request({
-        method: "eth_requestAccounts",
-      });
-      const address = accounts[0];
-      const message = "I am connecting my wallet to Slice platform";
-      const signature = await (window as any).ethereum.request({
-        method: "personal_sign",
-        params: [message, address],
-      });
-      const chainId = await (window as any).ethereum.request({
-        method: "eth_chainId",
-      });
-
-      setLink(
-        `tg:join?invite=jbSDkmCvBQEyNTk0?address=${encodeURIComponent(
-          address,
-        )}&signature=${encodeURIComponent(signature)}&chainId=${encodeURIComponent(chainId)}`,
-      );
-    }
-    run();
-  }, []);
+  const [user, setUser] = useState<User | null>(null);
+  const [step, setStep] = useState<Step>("idle");
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const tokenFromUrl = params.get("token");
 
-    if (tokenFromUrl) {
-      setToken(tokenFromUrl);
-      getProfile(tokenFromUrl);
+    if (!tokenFromUrl) {
+      setStep("error");
+      setErrorMessage("Missing authentication token");
+      return;
     }
+
+    runFlow(tokenFromUrl);
   }, []);
 
-  async function getProfile(authToken: string) {
+  async function runFlow(authToken: string) {
     try {
-      const resp = await fetch("/api/auth/profile", {
+      setStep("checking");
+
+      // 1️⃣ Get Profile
+      const profileResp = await fetch("/api/auth/profile", {
         method: "GET",
         headers: {
           "Content-Type": "application/json",
@@ -61,29 +45,87 @@ function App() {
         },
       });
 
-      if (!resp.ok) {
+      if (!profileResp.ok) {
         throw new Error("Failed to fetch profile");
       }
 
-      const data = await resp.json();
-      setUser(data);
-      console.log("User loaded:", data);
-    } catch (error) {
+      const profileData: User = await profileResp.json();
+      setUser(profileData);
+
+      // 2️⃣ Connect Wallet
+      setStep("connecting");
+      await connectWallet(authToken);
+
+      // 3️⃣ Success
+      setStep("done");
+    } catch (error: any) {
       console.error(error);
+      setErrorMessage(error.message || "Something went wrong");
+      setStep("error");
     }
   }
 
-  if (!user) {
-    return <>Profile not found</>;
+  async function connectWallet(authToken: string) {
+    if (!(window as any).ethereum) {
+      throw new Error("MetaMask not detected");
+    }
+
+    const accounts = await (window as any).ethereum.request({
+      method: "eth_requestAccounts",
+    });
+
+    const address = accounts[0];
+    const message = "I am connecting my wallet to Slice platform";
+
+    const signature = await (window as any).ethereum.request({
+      method: "personal_sign",
+      params: [message, address],
+    });
+
+    const chainId = await (window as any).ethereum.request({
+      method: "eth_chainId",
+    });
+
+    const payload = {
+      walletAddress: address,
+      walletType: "metamask",
+      chainId: parseInt(chainId, 16),
+      signature,
+      message,
+    };
+
+    const connectResp = await fetch("/api/properties/wallet/connect", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${authToken}`,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!connectResp.ok) {
+      throw new Error("Wallet connection failed");
+    }
   }
 
   return (
-    <>
-      <div>
-        <pre>{user && JSON.stringify(user, null, 2)}</pre>
-        <div></div>
-      </div>
-    </>
+    <div style={{ textAlign: "center", marginTop: 50 }}>
+      {step === "idle" && <h2>Initializing...</h2>}
+      {step === "checking" && <h2>Checking profile...</h2>}
+      {step === "connecting" && <h2>Connecting wallet...</h2>}
+      {step === "done" && (
+        <>
+          <h2>Wallet connected successfully ✅</h2>
+          <pre>{JSON.stringify(user, null, 2)}</pre>
+        </>
+      )}
+      {step === "error" && (
+        <>
+          <h2>Something went wrong ❌</h2>
+          <p>{errorMessage}</p>
+        </>
+      )}
+    </div>
   );
 }
 
